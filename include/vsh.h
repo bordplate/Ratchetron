@@ -1,3 +1,18 @@
+#ifndef __VSH_H
+#define __VSH_H
+
+#include "common.h"
+
+#include "../vsh/game_plugin.h"
+#include "../vsh/netctl_main.h"
+#include "../vsh/vsh.h"
+#include "../vsh/vshnet.h"
+#include "../vsh/vshmain.h"
+#include "../vsh/vshcommon.h"
+#include "../vsh/vshtask.h"
+#include "../vsh/explore_plugin.h"
+#include "../vsh/paf.h"
+
 #define EXPLORE_CLOSE_ALL   3
 
 static int get_game_info(void)
@@ -18,3 +33,5 @@ static int get_game_info(void)
 
 	return is_ingame;
 }
+
+#endif

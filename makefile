@@ -14,7 +14,7 @@ CRT_HEAD += $(shell ppu-lv2-gcc -print-file-name'='crtbegin.o)
 CRT_HEAD += $(shell ppu-lv2-gcc -print-file-name'='ecrtn.o)
 CRT_TAIL += $(shell ppu-lv2-gcc -print-file-name'='crtend.o)
 
-PPU_SRCS = libc.c printf.c main.c
+PPU_SRCS = libc.c printf.c main.c ratchetron.c
 PPU_PRX_TARGET = ratchetron_server.prx
 PPU_PRX_LDFLAGS += $(PRX_LDFLAGS_EXTRA)
 PPU_PRX_STRIP_FLAGS = -s

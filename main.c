@@ -1,82 +1,23 @@
-#include <sdk_version.h>
-#include <cellstatus.h>
-#include <cell/cell_fs.h>
-#include <cell/rtc.h>
-#include <cell/gcm.h>
-#include <cell/pad.h>
-#include <cell/pad/libpad_dbg.h>
-#include <sys/vm.h>
-#include <sysutil/sysutil_common.h>
-
 #include <sys/prx.h>
-#include <sys/ppu_thread.h>
-#include <sys/event.h>
-#include <sys/syscall.h>
-#include <sys/socket.h>
-#include <sys/types.h>
-#include <sys/memory.h>
-#include <sys/timer.h>
-#include <sys/process.h>
 
-#include <netinet/in.h>
-#include <arpa/inet.h>
-#include <netdb.h>
-#include <netex/net.h>
-#include <netex/errno.h>
-#include <netex/libnetctl.h>
-#include <netex/sockinfo.h>
-#include <netinet/tcp.h>
-#include <sys/syscall.h>
-
-#include <stdarg.h>
-#include <stdlib.h>
-#include <string.h>
-#include <time.h>
-#include <unistd.h>
-#include <sys/stat.h>
-
-#include "types.h"
+#include "include/types.h"
 #include "include/timer.h"
-#include "common.h"
-
-#include "cobra/syscall8.h"
-#include "vsh/game_plugin.h"
-#include "vsh/netctl_main.h"
-#include "vsh/vsh.h"
-#include "vsh/vshnet.h"
-#include "vsh/vshmain.h"
-#include "vsh/vshcommon.h"
-#include "vsh/vshtask.h"
-#include "vsh/explore_plugin.h"
-#include "vsh/paf.h"
+#include "include/common.h"
 
 #include "include/thread.h"
 
-static char _game_TitleID[16]; //#define _game_TitleID  _game_info+0x04
-static char _game_Title  [64]; //#define _game_Title    _game_info+0x14
+int ratchetron_start(size_t args, void *argp);
+int ratchetron_stop(void);
 
 SYS_MODULE_INFO(Ratchetron, 0, 1, 1);
 SYS_MODULE_START(ratchetron_start);
 SYS_MODULE_STOP(ratchetron_stop);
 SYS_MODULE_EXIT(ratchetron_stop);
 
-
-static int active_socket[4] = {NONE, NONE, NONE, NONE}; // 0=FTP, 1=WWW, 2=PS3MAPI, 3=PS3NETSRV
-
-static volatile u8 working = 1;
-
-static void show_msg(const char *text);
-static void show_status(const char *label, const char *status);
-
-#include "include/vpad.h"
-#include "include/socket.h"
-#include "include/buffer_size.h"
 #include "include/vsh_notify.h"
-#include "include/vsh.h"
 #include "include/process.h"
-
-#define APIPORT		(9671)  // Last 4 digits of Clank's serial number
 #include "include/ps3mapi.h"
+#include "include/ratchetron.h"
 
 int ratchetron_start(size_t args, void *argp)
 {

@@ -1,3 +1,8 @@
+#ifndef SOCKET_H
+#define SOCKET_H
+
+#include <sys/socket.h>
+
 #define getPort(p1x, p2x) ((p1x * 256) + p2x)
 
 #define FAILED -1
@@ -34,3 +39,5 @@ static void sclose(int *socket_e)
 		*socket_e = NONE;
 	}
 }
+
+#endif

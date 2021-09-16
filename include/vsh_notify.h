@@ -1,6 +1,17 @@
 //------------
 /* Based on PHTNC's code to write VSH Notify notifications with icons */
 
+#ifndef __VSH_NOTIFY_H
+#define __VSH_NOTIFY_H
+
+#include "vsh.h"
+
+#include "common.h"
+#include "types.h"
+
+static void show_msg(const char *text);
+static void show_status(const char *label, const char *status);
+
 enum rco_icons
 {
 	ICON_CAUTION	 = 3,
@@ -118,3 +129,5 @@ static void show_msg(const char *text)
 	else
 		vshtask_notify(msg);
 }
+
+#endif

@@ -331,4 +331,7 @@ extern int32_t vshmain_981D7E9F(void);     // GetScreenshotFlag
 // vshmain_0D6DC1E3  // "PESM"
 // vshmain_9217DD89  // "PESM"
 
+#define IS_ON_XMB		(GetCurrentRunningMode() == 0)
+#define IS_INGAME		(GetCurrentRunningMode() != 0)
+
 #endif // __VSHMAIN_H__

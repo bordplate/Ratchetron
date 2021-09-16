@@ -235,7 +235,7 @@ int32_t vshnet_59106229(const char *url);  // overrides regular update.txt url
 // vshnet_5DF6457E  // ?
 // vshnet_5E9FDA92  // ?
 // vshnet_5EA49E2A  // ?
-int32_t (*vshnet_5EE098BC)(int,void*,int) = 0; // used for getting klicensee struct
+//int32_t (*vshnet_5EE098BC)(int,void*,int) = 0; // used for getting klicensee struct
 // vshnet_5EE81C09  // ?
 // vshnet_5EF49155  // ?
 // vshnet_5F2D9EF3  // ?

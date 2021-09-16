@@ -17,8 +17,6 @@ static void unload_prx_module(void)
 
 static void stop_prx_module(void)
 {
-	working = 0;
-
 	sys_prx_id_t prx = prx_get_module_id_by_address(stop_prx_module);
 
 	// int *result = NULL;
