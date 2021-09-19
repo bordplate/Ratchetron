@@ -40,23 +40,310 @@
 typedef unsigned char BYTE;
 
 /// Server commands
-#define SRV_CMD_CONNECTED       (BYTE)0x01    // <CMD|B:1>
-#define SRV_CMD_VERSION         (BYTE)0x02    // <CMD|B:1><REVISION|I:4>
-#define SRV_CMD_MSG             (BYTE)0x03    // <CMD|B:1><SIZE|I:4><MSG|S:SIZE>
-#define SRV_CMD_ERROR           (BYTE)0x04    // <CMD|B:1><ERROR|H:1>
+#define SRV_CMD_CONNECTED       (u8)0x01    // <CMD|B:1>
+#define SRV_CMD_VERSION         (u8)0x02    // <CMD|B:1><REVISION|I:4>
+#define SRV_CMD_MSG             (u8)0x03    // <CMD|B:1><SIZE|I:4><MSG|S:SIZE>
+#define SRV_CMD_ERROR           (u8)0x04    // <CMD|B:1><ERROR|H:1>
+#define SRV_CMD_MEMSET          (u8)0x05    // <CMD|B:1><PID|I:4><ADDR|I:4><SIZE|I:4><MEMORY:SIZE>
+#define SRV_CMD_MEM_CHANGED     (u8)0x06    // <CMD|B:1><MSID|I:4><SIZE|I:4><NEWVALUE:SIZE>
+#define SRV_CMD_CURRENT_GAME    (u8)0x07    // <CMD|B:1><SIZE|I:4><TITLEID:SIZE>
 
 /// Client commands
-#define CLT_CMD_NOTIFY          (BYTE)0x02    // <CMD|B:1><SIZE|I:4><MSG|S:SIZE>
-#define CLT_CMD_LIST_PROCESSES  (BYTE)0x03    // <CMD|B:1>
-#define CLT_CMD_MEMREAD         (BYTE)0x04    // <CMD|B:1><PID|I:4><ADDR|I:4><BYTES|I:4>
-#define CLT_CMD_MEMSET          (BYTE)0x05    // <CMD|B:1><PID|I:4><ADDR|I:4><SIZE|I:4><MEMORY:SIZE>
-#define CLT_CMD_TITLEID         (BYTE)0x06    // <CMD|B:1>
-#define CLT_CMD_TITLE           (BYTE)0x07    // <CMD|B:1>
-#define CLT_CMD_PAD_DATA        (BYTE)0x08    // <CMD|B:1>
+#define CLT_CMD_NOTIFY          (u8)0x02    // <CMD|B:1><SIZE|I:4><MSG|S:SIZE>
+#define CLT_CMD_LIST_PROCESSES  (u8)0x03    // <CMD|B:1>
+#define CLT_CMD_MEMREAD         (u8)0x04    // <CMD|B:1><PID|I:4><ADDR|I:4><BYTES|I:4>
+#define CLT_CMD_MEMSET          (u8)0x05    // <CMD|B:1><PID|I:4><ADDR|I:4><SIZE|I:4><MEMORY:SIZE>
+#define CLT_CMD_TITLEID         (u8)0x06    // <CMD|B:1>
+#define CLT_CMD_TITLE           (u8)0x07    // <CMD|B:1>
+#define CLT_CMD_PAD_DATA        (u8)0x08    // <CMD|B:1>
+#define CLT_CMD_OPEN_ASYNC_DATA (u8)0x09    // <CMD|B:1><PORT|UINT:4>
+#define CLT_CMD_SUB_MEM         (u8)0x0a    // <CMD|B:1><PID|I:4><ADDR|I:4><SIZE|I:4><COND|B:1><CONDMEM:SIZE>
+#define CLT_CMD_FREEZE_MEM      (u8)0x0b    // <CMD|B:1><PID|I:4><ADDR|I:4><SIZE|I:4><COND|B:1><CONDMEM:SIZE>
+#define CLT_CMD_FREE_SUB        (u8)0x0c    // <CMD|B:1><MSID|I:4>
+#define CLT_CMD_ENABLE_DEBUG    (u8)0x0d    // <CMD|B:1>
 
+#define MEM_SUB_TYPE_FREEZE     (u8)0x01
+#define MEM_SUB_TYPE_NOTIFY     (u8)0x02
+
+#define MEM_COND_ANY            (u8)0x01
+#define MEM_COND_CHANGED        (u8)0x02
+#define MEM_COND_ABOVE          (u8)0x03
+#define MEM_COND_BELOW          (u8)0x04
+#define MEM_COND_EQUAL          (u8)0x05
+#define MEM_COND_NOT_EQUAL      (u8)0x06
 
 #define RATCHETRON_CONNECT_NOTIF 	    "Ratchetron: Client connected [%s]\r\n"
 #define RATCHETRON_DISCONNECT_NOTIF     "Ratchetron: Client disconnected [%s]\r\n"
+
+struct MemorySub {
+    u32 pid;
+    u32 addr;
+    u32 size;
+    u8 cond;
+    u64 value;  // if size is larger than u64, value is a ptr
+    u8 type;  // memory subscription or freeze
+};
+
+struct MemorySubContainer {
+    struct MemorySub memory_sub;
+    u32 id;
+    u8 free;
+    int sock_fd;
+    u64 last_value;
+    u32 tick_updated;
+    u32 sent_last_tick;
+    struct MemorySubContainer* fwd;
+};
+
+struct MemorySubContainer *memory_sub_area = 0;
+u32 memory_sub_size = 0;
+
+struct AsyncDataDesc {
+    struct sockaddr_in sockaddr;
+    int open;
+    int tcp_sock_fd;
+};
+
+/*
+ * // simple atomic mutex from CreepNT
+ *
+uint32_t mutex = 0;
+
+void lock_mutex(uint32_t* pmtx) {
+  while (atomic_swap_uint32(pmtx, 1) != 0);
+  return;
+}
+
+void unlock_mutex(uint32_t* pmtx) {
+  atomic_write_uint32(pmtx, 0);
+}
+
+ */
+
+int reallocating = 0;
+int debug_enabled = 0;
+
+void debug_msg(const char *message) {
+    if (debug_enabled == 1) {
+        show_msg(message);
+    }
+}
+
+// this doesn't work
+void reallocate_memory_sub_area() {
+    reallocating = 1;
+    memory_sub_area = (struct MemorySubContainer *)realloc(memory_sub_area, memory_sub_size);
+
+    // Fix fwd memory pointers
+    struct MemorySubContainer *current_btrfly = memory_sub_area;
+    while (1) {
+        if (current_btrfly->fwd == NULL) {
+            break;
+        }
+
+        current_btrfly->fwd = current_btrfly + 1;
+        current_btrfly = current_btrfly->fwd;
+    }
+
+    reallocating = 0;
+}
+
+u32 add_memory_sub(struct MemorySub *mem, int sock_fd) {
+    struct MemorySubContainer btrfly;
+    btrfly.id = 0;
+    btrfly.free = 0;
+    btrfly.fwd = 0;
+    btrfly.sock_fd = sock_fd;
+
+    memcpy(&btrfly, mem, sizeof(struct MemorySub));
+
+    struct MemorySubContainer *current_btrfly = memory_sub_area;
+    while (1) {
+        // Allocate more memory
+        if ((u64)current_btrfly + sizeof(struct MemorySubContainer) > (u64)memory_sub_area + memory_sub_size) {
+            debug_msg("DEBUG: Allocating more memory for MemorySubContainers");
+            memory_sub_size = memory_sub_size + 1024;
+            reallocate_memory_sub_area();
+        }
+
+        btrfly.fwd = (current_btrfly + 1);
+        if (current_btrfly->fwd == NULL) {
+            // when fwd butterfly is null it means we haven't allocated this one yet
+            memcpy(current_btrfly, &btrfly, sizeof(struct MemorySubContainer));
+            break;
+        }
+
+        if (current_btrfly->free == 1) {
+            memcpy(current_btrfly, &btrfly, sizeof(struct MemorySubContainer));
+            break;
+        }
+
+        btrfly.id++;
+        current_btrfly = current_btrfly->fwd;
+    }
+
+    return btrfly.id;
+}
+
+void remove_memory_sub(u32 id) {
+    struct MemorySubContainer memorySubContainer = memory_sub_area[id];
+    memorySubContainer.free = 1;
+    memorySubContainer.sent_last_tick = 0;
+    memorySubContainer.tick_updated = 0;
+
+    memory_sub_area[id] = memorySubContainer;
+}
+
+void remove_memory_sub_by_sock_fd(int sock_fd) {
+    struct MemorySubContainer *memorySubContainer = memory_sub_area;
+    do {
+        if (memorySubContainer->free == 1) {  // we don't do anything with free'd stuff
+            memorySubContainer = memorySubContainer->fwd;
+            continue;
+        }
+
+        if (memorySubContainer->sock_fd == sock_fd) {
+            remove_memory_sub(memorySubContainer->id);
+        }
+
+        if (memorySubContainer->fwd == NULL) { // this means we reached the end
+            break;
+        }
+
+        memorySubContainer = memorySubContainer->fwd;
+    } while (1);
+}
+
+static void async_data_handle(u64 sa) {
+    char buffer[PS3MAPI_RECV_SIZE + 1];
+
+    struct AsyncDataDesc *desc = (struct AsyncDataDesc *)sa;
+
+    struct sockaddr_in sockaddr = desc->sockaddr;
+    int owning_sock = desc->tcp_sock_fd;
+
+    char str[INET_ADDRSTRLEN];
+    inet_ntop(AF_INET, &(sockaddr.sin_addr.s_addr), str, INET_ADDRSTRLEN);
+
+    sprintf(buffer, "DEBUG: Data channel opening with: %s:%d", str, htons(sockaddr.sin_port));
+    debug_msg(buffer);
+
+    int s = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+    if(s < 0) {
+        show_msg("Failed to open data channel");
+        sys_ppu_thread_exit(0);
+    }
+
+    debug_msg("DEBUG: Opened async data channel");
+
+    const char *msg = "I was gonna tell you a joke about UDP\n";
+    sendto(s, msg, strlen(msg)+1, 0, &sockaddr, sizeof(struct sockaddr_in));
+
+    u32 tick = 0;  // at 120 ticks per second it would take 414 days for this to overflow
+    while (desc->open == 1) {
+        if (reallocating == 1) {  // wait for reallocation to finish
+            continue;
+        }
+
+        struct MemorySubContainer *memorySubContainer = memory_sub_area;
+        while (memorySubContainer->fwd != NULL) {
+            if (memorySubContainer->free == 1 || memorySubContainer->sock_fd != owning_sock) {  // we don't do anything with free'd stuff or stuff that doesn't belong to this connection
+                memorySubContainer = memorySubContainer->fwd;
+                continue;
+            }
+
+            struct MemorySub memorySub = memorySubContainer->memory_sub;
+            u64 curr_value;
+
+            ps3mapi_get_memory(memorySub.pid, memorySub.addr, (char*)&curr_value, memorySub.size);
+
+            int hit_conditional = 0;
+            switch(memorySub.cond) {
+                case MEM_COND_ANY: {
+                    hit_conditional = 1;
+                    break;
+                }
+                case MEM_COND_CHANGED: {
+                    if (curr_value != memorySubContainer->last_value) {
+                        hit_conditional = 1;
+                        break;
+                    }
+                }
+                case MEM_COND_ABOVE: {
+                    if (curr_value > memorySub.value) {
+                        hit_conditional = 1;
+                    }
+                    break;
+                }
+                case MEM_COND_BELOW: {
+                    if (curr_value < memorySub.value) {
+                        hit_conditional = 1;
+                    }
+                    break;
+                }
+                case MEM_COND_EQUAL: {
+                    if (curr_value == memorySub.value) {
+                        hit_conditional = 1;
+                    }
+                    break;
+                }
+                case MEM_COND_NOT_EQUAL: {
+                    if (curr_value != memorySub.value) {
+                        hit_conditional = 1;
+                    }
+                    break;
+                }
+                default: {
+                    break;
+                }
+            }
+
+            if (hit_conditional == 1) {
+                if (memorySub.type == MEM_SUB_TYPE_FREEZE) {
+                    ps3mapi_patch_process(memorySub.pid, memorySub.addr, (const char*)&memorySub.value, memorySub.size);
+                } else {
+                    memorySubContainer->tick_updated = tick;
+                    memorySubContainer->sent_last_tick = tick;
+
+                    u8 resp[22] = {SRV_CMD_MEM_CHANGED};
+                    memcpy(&resp[1], &memorySubContainer->id, sizeof(memorySubContainer->id));
+                    memcpy(&resp[5], &memorySub.size, sizeof(memorySub.size));
+                    memcpy(&resp[9], &memorySubContainer->tick_updated, sizeof(memorySubContainer->tick_updated));
+                    memcpy(&resp[13], &curr_value, memorySub.size);
+
+                    sendto(s, &resp, sizeof(resp), 0, &sockaddr, sizeof(struct sockaddr_in));
+                }
+            }
+
+            // since we're sending over UDP we just remind the client what the value was, if we lost any packets
+            // this will make sure the client will know
+            // this should remind the client every half a second (current_tick - last_sent_tick > 60)
+            if (memorySubContainer->memory_sub.type == MEM_SUB_TYPE_NOTIFY && tick - memorySubContainer->sent_last_tick > 60) {
+                memorySubContainer->sent_last_tick = tick;
+
+                u8 resp[22] = {SRV_CMD_MEM_CHANGED};
+                memcpy(&resp[1], &memorySubContainer->id, sizeof(memorySubContainer->id));
+                memcpy(&resp[5], &memorySub.size, sizeof(memorySub.size));
+                memcpy(&resp[9], &memorySubContainer->tick_updated, sizeof(memorySubContainer->tick_updated));
+                memcpy(&resp[13], &curr_value, memorySub.size);
+
+                sendto(s, &resp, sizeof(resp), 0, &sockaddr, sizeof(struct sockaddr_in));
+            }
+
+            memorySubContainer->last_value = curr_value;
+
+            memorySubContainer = memorySubContainer->fwd;
+        }
+
+        sys_ppu_thread_yield();
+        sys_timer_usleep(8333);  // loop should be running 120 times a second
+
+        tick++;
+    }
+
+    free(desc);
+    sys_ppu_thread_exit(0);
+}
 
 static void handleclient_ps3mapi(u64 conn_s_ps3mapi_p)
 {
@@ -98,6 +385,11 @@ static void handleclient_ps3mapi(u64 conn_s_ps3mapi_p)
         // We should unload ourselves at this point, but unloading doesn't work for some reason.
         return;
     }
+
+    struct AsyncDataDesc *async_desc = malloc(sizeof(struct AsyncDataDesc));
+    memset(async_desc, 0, sizeof(struct AsyncDataDesc));
+
+    sys_ppu_thread_t async_t_id = SYS_PPU_THREAD_NONE;
 
     while(connactive == 1) {
         memset(buffer, 0, sizeof(buffer));
@@ -164,7 +456,7 @@ static void handleclient_ps3mapi(u64 conn_s_ps3mapi_p)
                 }
                 case CLT_CMD_LIST_PROCESSES: {
                     u32 pid_list[16];
-                    { system_call_3(SC_COBRA_SYSCALL8, SYSCALL8_OPCODE_PS3MAPI, PS3MAPI_OPCODE_GET_ALL_PROC_PID, (u64)(u32)pid_list); }
+                    { system_call_3(SC_COBRA_SYSCALL8, SYSCALL8_OPCODE_PS3MAPI, PS3MAPI_OPCODE_GET_ALL_PROC_PID, (u64)pid_list); }
                     send(conn_s, &pid_list, sizeof(pid_list), 0);
                     break;
                 }
@@ -191,6 +483,114 @@ static void handleclient_ps3mapi(u64 conn_s_ps3mapi_p)
 
                     break;
                 }
+                case CLT_CMD_OPEN_ASYNC_DATA: {
+                    u32 port;
+                    recv(conn_s, &port, 4, 0);
+
+                    if (async_t_id != SYS_PPU_THREAD_NONE) {
+                        send(conn_s, '\x02', 1, 0);
+                        break;
+                    }
+
+                    struct sockaddr_in *sa = &async_desc->sockaddr;
+                    socklen_t sin_len = sizeof(struct sockaddr_in);
+                    memset(sa, 0, sin_len);
+
+                    sa->sin_family = AF_INET;
+                    sa->sin_port = htons(port);
+                    sa->sin_addr.s_addr = inet_addr(inet_ntoa(conn_info.remote_adr));  // dumb
+
+                    char str[INET_ADDRSTRLEN];
+                    inet_ntop(AF_INET, &(sa->sin_addr.s_addr), str, INET_ADDRSTRLEN);
+
+                    async_desc->open = 1;
+                    async_desc->tcp_sock_fd = conn_s;
+
+                    if (sys_ppu_thread_create(&async_t_id, async_data_handle, (u64)async_desc, THREAD_PRIO_POLL, THREAD_STACK_SIZE_24KB, SYS_PPU_THREAD_CREATE_JOINABLE, THREAD_NAME_ASYNC_DATA) == CELL_OK) {
+                        send(conn_s, '\x01', 1, 0);
+                    } else {
+                        send(conn_s, '\x00', 1, 0);
+                    }
+                    break;
+                }
+                case CLT_CMD_SUB_MEM: {
+                    u32 pid;
+                    u32 addr;
+                    u32 size;
+                    u8 cond;
+                    recv(conn_s, &pid, sizeof(pid), 0);
+                    recv(conn_s, &addr, sizeof(addr), 0);
+                    recv(conn_s, &size, sizeof(size), 0);
+                    recv(conn_s, &cond, sizeof(cond), 0);
+
+                    struct MemorySub memorySub;
+                    memset(&memorySub, 0, sizeof(memorySub));
+
+                    memorySub.pid = pid;
+                    memorySub.addr = addr;
+                    memorySub.size = size;
+                    memorySub.cond = cond;
+                    memorySub.type = MEM_SUB_TYPE_NOTIFY;
+                    memorySub.value = 0;
+
+                    if (size <= 8 && size != 0) {
+                        recv(conn_s, &memorySub.value, size, 0);
+                    } else if (size > 8) {
+                        // malloc
+                        send(conn_s, '\xff\xff\xff\xff', 4, 0); // can't freeze or sub to values with size above 8 at this time
+                        break;
+                    }
+
+                    u32 sub_id = add_memory_sub(&memorySub, conn_s);
+                    send(conn_s, &sub_id, sizeof(sub_id), 0);
+
+                    break;
+                }
+                case CLT_CMD_FREEZE_MEM: { // <CMD|B:1><PID|I:4><ADDR|I:4><SIZE|I:4><COND|B:1><CONDMEM:SIZE>
+                    u32 pid;
+                    u32 addr;
+                    u32 size;
+                    u8 cond;
+                    recv(conn_s, &pid, sizeof(pid), 0);
+                    recv(conn_s, &addr, sizeof(addr), 0);
+                    recv(conn_s, &size, sizeof(size), 0);
+                    recv(conn_s, &cond, sizeof(cond), 0);
+
+                    struct MemorySub memorySub;
+                    memset(&memorySub, 0, sizeof(memorySub));
+
+                    memorySub.pid = pid;
+                    memorySub.addr = addr;
+                    memorySub.size = size;
+                    memorySub.cond = cond;
+                    memorySub.type = MEM_SUB_TYPE_FREEZE;
+
+                    if (size <= 8) {
+                        recv(conn_s, &memorySub.value, size, 0);
+                    } else {
+                        // malloc
+                        send(conn_s, '\xff\xff\xff\xff', 4, 0); // can't freeze or sub to values with size above 8 at this time
+                        break;
+                    }
+
+                    u32 sub_id = add_memory_sub(&memorySub, conn_s);
+                    send(conn_s, &sub_id, sizeof(sub_id), 0);
+
+                    break;
+                }
+                case CLT_CMD_FREE_SUB: {
+                    u32 mem_sub_id;
+                    recv(conn_s, &mem_sub_id, sizeof(mem_sub_id), 0);
+
+                    remove_memory_sub(mem_sub_id);
+
+                    send(conn_s, '\x01', 1, 0);
+
+                    break;
+                }
+                case CLT_CMD_ENABLE_DEBUG: {
+                    debug_enabled = 1;
+                }
                 default: {
                     // error of some kind, recover?
                 }
@@ -208,13 +608,23 @@ static void handleclient_ps3mapi(u64 conn_s_ps3mapi_p)
     sprintf(buffer, RATCHETRON_DISCONNECT_NOTIF, inet_ntoa(conn_info.remote_adr));
     vshNotify_WithIcon(ICON_NETWORK, buffer);
 
+    remove_memory_sub_by_sock_fd(conn_s);
     sclose(&conn_s);
+
+    async_desc->open = 0;
+
 
     sys_ppu_thread_exit(0);
 }
 
 void ps3mapi_thread(__attribute__((unused)) u64 arg)
 {
+    if (memory_sub_area == NULL) {
+        memory_sub_area = malloc(1024 * 32);
+        memset(memory_sub_area, 0, 1024 * 32);
+        memory_sub_size = 1024 * 32;
+    }
+
     int core_minversion = 0;
     {
         system_call_2(SC_COBRA_SYSCALL8, SYSCALL8_OPCODE_PS3MAPI, PS3MAPI_OPCODE_GET_CORE_MINVERSION);
@@ -273,6 +683,8 @@ void ps3mapi_thread(__attribute__((unused)) u64 arg)
     } else {
         vshNotify_WithIcon(ICON_ERROR, (char *)"Ratchetron: Internal PS3MAPI version not supported!");
     }
+
+    free(memory_sub_area);
 
     sys_ppu_thread_exit(0);
 }

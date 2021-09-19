@@ -22,7 +22,7 @@ PPU_PRX_LDLIBS	=	-lfs_stub -lnet_stub -lrtc_stub -lio_stub -lstdc_export_stub \
 					-lvshcommon_export_stub \
 					-lpaf_export_stub \
 					-lvshmain_export_stub \
-					-lvshtask_export_stub -lsdk_export_stub
+					-lvshtask_export_stub -lsdk_export_stub -lallocator_export_stub
 
 PPU_CFLAGS +=	-Os -ffunction-sections -fdata-sections \
 				-fno-builtin-printf -nodefaultlibs -std=gnu99 \

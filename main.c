@@ -6,6 +6,8 @@
 
 #include "include/thread.h"
 
+#include <semaphore.h>
+
 int ratchetron_start(size_t args, void *argp);
 int ratchetron_stop(void);
 
@@ -43,10 +45,10 @@ static void ratchetron_stop_thread(u64 arg) {
 int ratchetron_stop(void)
 {
 	sys_ppu_thread_t t_id;
-	int ret = sys_ppu_thread_create(&t_id, STOP_THREAD_NAME, NULL, THREAD_PRIO_STOP, THREAD_STACK_SIZE_STOP_THREAD, SYS_PPU_THREAD_CREATE_JOINABLE, STOP_THREAD_NAME);
+	int ret = sys_ppu_thread_create(&t_id, ratchetron_stop_thread, NULL, THREAD_PRIO_STOP, THREAD_STACK_SIZE_STOP_THREAD, SYS_PPU_THREAD_CREATE_JOINABLE, STOP_THREAD_NAME);
 
 	u64 exit_code;
-	if (ret == 0) sys_ppu_thread_join(t_id, &exit_code);
+	sys_ppu_thread_join(thread_id_ps3mapi, &exit_code);
 
 	sys_ppu_thread_usleep(500000);
 
