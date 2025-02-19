@@ -1,6 +1,10 @@
 # Ratchetron
+Ratchetron is a PS3 module made for fast memory manipulation remotely over TCP and UDP. Other APIs are generally fairly slow and won't let you constantly read memory at addresses in real-time. Ratchetron uses a custom binary protocol that lets you query or set the memory contents of arbitrary addresses in any running process on the PS3.  
+
+You can also subscribe to an address and be notified when the contents of that address changes. This way we save on network bandwidth, and changes to an address will be received faster by the client than polling would allow for. 
+
 ## Building
-Good luck.
+Set up your build environment the same way you would for webMAN MOD. 
 
 ## License
 ### webMAN MOD
