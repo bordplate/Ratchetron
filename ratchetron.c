@@ -5,9 +5,11 @@
 #include "include/ratchetron.h"
 #include "include/syscall8.h"
 
+#include <cell/pad.h>
+
 #define PS3MAPI_RECV_SIZE  2048
 #define PS3MAPI_MAX_LEN	383
-#define API_REVISION 1
+#define API_REVISION 4
 
 /**
  * Custom binary protocol for managing PS3MAPI. This can't end well, should probably had gone for an established
@@ -61,6 +63,8 @@ typedef unsigned char BYTE;
 #define CLT_CMD_FREEZE_MEM      (u8)0x0b    // <CMD|B:1><PID|I:4><ADDR|I:4><SIZE|I:4><COND|B:1><CONDMEM:SIZE>
 #define CLT_CMD_FREE_SUB        (u8)0x0c    // <CMD|B:1><MSID|I:4>
 #define CLT_CMD_ENABLE_DEBUG    (u8)0x0d    // <CMD|B:1>
+#define CLT_CMD_ALLOC_PAGE      (u8)0x0e    // <CMD|B:1><PID|I:4><SIZE|I:4><FLAGS|I:4><ISEXECUTABLE|I:4>
+#define CLT_CMD_LV2_POKE        (u8)0x0f    // <CMD|B:1><ADDR|I:8><VALUE|I:8>
 
 #define MEM_SUB_TYPE_FREEZE     (u8)0x01
 #define MEM_SUB_TYPE_NOTIFY     (u8)0x02
@@ -103,22 +107,6 @@ struct AsyncDataDesc {
     int open;
     int tcp_sock_fd;
 };
-
-/*
- * // simple atomic mutex from CreepNT
- *
-uint32_t mutex = 0;
-
-void lock_mutex(uint32_t* pmtx) {
-  while (atomic_swap_uint32(pmtx, 1) != 0);
-  return;
-}
-
-void unlock_mutex(uint32_t* pmtx) {
-  atomic_write_uint32(pmtx, 0);
-}
-
- */
 
 int reallocating = 0;
 int debug_enabled = 0;
@@ -246,7 +234,13 @@ static void async_data_handle(u64 sa) {
         }
 
         struct MemorySubContainer *memorySubContainer = memory_sub_area;
-        while (memorySubContainer->fwd != NULL) {
+
+        if (!IS_INGAME) {
+            memorySubContainer->fwd = NULL;
+            continue;
+        }
+
+        while (memorySubContainer->fwd != NULL && IS_INGAME) {
             if (memorySubContainer->free == 1 || memorySubContainer->sock_fd != owning_sock) {  // we don't do anything with free'd stuff or stuff that doesn't belong to this connection
                 memorySubContainer = memorySubContainer->fwd;
                 continue;
@@ -266,8 +260,8 @@ static void async_data_handle(u64 sa) {
                 case MEM_COND_CHANGED: {
                     if (curr_value != memorySubContainer->last_value) {
                         hit_conditional = 1;
-                        break;
                     }
+                    break;
                 }
                 case MEM_COND_ABOVE: {
                     if (curr_value > memorySub.value) {
@@ -394,8 +388,19 @@ static void handleclient_ps3mapi(u64 conn_s_ps3mapi_p)
     while(connactive == 1) {
         memset(buffer, 0, sizeof(buffer));
 
+        long received = 0;
+
         // Read command, 1 byte
-        if (recv(conn_s, buffer, 1, 0) > 0) {
+        // Flag 0x40 is MSG_DONTWAIT
+        while ((received = recv(conn_s, buffer, 1, 0x40)) > 0) {
+            if (received > 0x80000000) {
+                if (received != 0x80010223) {  // Just means there was no data available.
+                    connactive = 0;
+                    break;
+                }
+                continue;
+            }
+
             switch(buffer[0]) {
                 case CLT_CMD_NOTIFY: {
                     int msg_size = 0;
@@ -440,7 +445,7 @@ static void handleclient_ps3mapi(u64 conn_s_ps3mapi_p)
                     recv(conn_s, &address, 4, 0);
                     recv(conn_s, &size, 4, 0);
 
-                    if (size >= 2048) {
+                    if (size >= 1024 * 64) {
                         show_msg("Tried to set too much memory at a time. Pls don't");
                         break;
                     }
@@ -477,9 +482,9 @@ static void handleclient_ps3mapi(u64 conn_s_ps3mapi_p)
                     // Might need to load a separate SPRX directly into the game and do IPC with it.
                     // For some reason there's no easy way to get controller data in processes that aren't on-screen.
 
-                    //CellPadData paddata = pad_read();
-
-                    //send(conn_s, &paddata, sizeof(CellPadData), 0);
+//                    struct CellPadData paddata = pad_read();
+//
+//                    send(conn_s, &paddata, sizeof(CellPadData), 0);
 
                     break;
                 }
@@ -590,16 +595,12 @@ static void handleclient_ps3mapi(u64 conn_s_ps3mapi_p)
                 }
                 case CLT_CMD_ENABLE_DEBUG: {
                     debug_enabled = 1;
+                    break;
                 }
                 default: {
                     // error of some kind, recover?
                 }
             }
-
-            sys_ppu_thread_yield();
-        } else {
-            connactive = 0;
-            break;
         }
     }
 
@@ -612,7 +613,6 @@ static void handleclient_ps3mapi(u64 conn_s_ps3mapi_p)
     sclose(&conn_s);
 
     async_desc->open = 0;
-
 
     sys_ppu_thread_exit(0);
 }
