@@ -431,8 +431,10 @@ static void handleclient_ps3mapi(u64 conn_s_ps3mapi_p)
 
                     char *mem = (char *)sysmem;
 
-                    ps3mapi_get_memory(pid, address, mem, size);
-                    send(conn_s, mem, size, 0);
+                    if (IS_INGAME) {
+                        ps3mapi_get_memory(pid, address, mem, size);
+                        send(conn_s, mem, size, 0);
+                    }
 
                     break;
                 }
@@ -455,7 +457,9 @@ static void handleclient_ps3mapi(u64 conn_s_ps3mapi_p)
                         n_bytes += (u32)recv(conn_s, memory, size, 0);
                     }
 
-                    ps3mapi_patch_process(pid, address, memory, size);
+                    if (IS_INGAME) {
+                        ps3mapi_patch_process(pid, address, memory, size);
+                    }
 
                     break;
                 }
