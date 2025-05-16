@@ -8,8 +8,8 @@ Set up your build environment the same way you would for webMAN MOD.
 
 ### Windows
 You will at least need the following:
-* PS3 toolchain, complete with /samples in the CELL_SDK path
-* CELL_SDK environment variable set to root of the PS3 SDK
+* PS3 toolchain, complete with `/samples` in the CELL_SDK path
+* `CELL_SDK` environment variable set to root of the PS3 SDK
 * Cygwin
 * MSYS2
 
