@@ -49,6 +49,7 @@ typedef unsigned char BYTE;
 #define SRV_CMD_MEMSET          (u8)0x05    // <CMD|B:1><PID|I:4><ADDR|I:4><SIZE|I:4><MEMORY:SIZE>
 #define SRV_CMD_MEM_CHANGED     (u8)0x06    // <CMD|B:1><MSID|I:4><SIZE|I:4><NEWVALUE:SIZE>
 #define SRV_CMD_CURRENT_GAME    (u8)0x07    // <CMD|B:1><SIZE|I:4><TITLEID:SIZE>
+#define SRV_CMD_INGAME_CHANGED  (u8)0x08    // <CMB|B:1><INGAME|B:1>
 
 /// Client commands
 #define CLT_CMD_NOTIFY          (u8)0x02    // <CMD|B:1><SIZE|I:4><MSG|S:SIZE>
@@ -110,6 +111,8 @@ struct AsyncDataDesc {
 
 int reallocating = 0;
 int debug_enabled = 0;
+
+int ingame_status = 0;
 
 void debug_msg(const char *message) {
     if (debug_enabled == 1) {
@@ -234,6 +237,13 @@ static void async_data_handle(u64 sa) {
         }
 
         struct MemorySubContainer *memorySubContainer = memory_sub_area;
+
+        if (ingame_status != IS_INGAME) {
+            ingame_status = IS_INGAME;
+
+            u8 resp[2] = { SRV_CMD_INGAME_CHANGED, ingame_status };
+            sendto(s, &resp, sizeof(resp), 0, &sockaddr, sizeof(struct sockaddr_in));
+        }
 
         if (!IS_INGAME) {
             memorySubContainer->fwd = NULL;
