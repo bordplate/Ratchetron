@@ -4,7 +4,17 @@ Ratchetron is a PS3 module made for fast memory manipulation remotely over TCP a
 You can also subscribe to an address and be notified when the contents of that address changes. This way we save on network bandwidth, and changes to an address will be received faster by the client than polling would allow for. 
 
 ## Building
-Set up your build environment the same way you would for webMAN MOD. 
+Set up your build environment the same way you would for webMAN MOD.
+
+### Windows
+You will at least need the following:
+* PS3 toolchain, complete with /samples in the CELL_SDK path
+* CELL_SDK environment variable set to root of the PS3 SDK
+* Cygwin
+* MSYS2
+
+Run _Make.bat to build the module. This will put you in Cygwin, so to make subsequent builds, you should `exit` and 
+then run `Make.bat` again.
 
 ## License
 ### webMAN MOD
