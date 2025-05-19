@@ -42,6 +42,19 @@
 #define THREAD_NAME_ASYNC_DATA                  "api_async_data"
 #define THREAD_NAME_ASYNC_DATA_WAIT             "api_async_data_wait"
 
+#define	MSG_OOB		0x1
+#define	MSG_PEEK	0x2
+#define MSG_DONTROUTE	0x4
+#define MSG_EOR		0x8
+#define MSG_TRUNC	0x10
+#define MSG_CTRUNC	0x20
+#define	MSG_WAITALL	0x40
+#define	MSG_DONTWAIT	0x80
+#define MSG_BCAST	0x100
+#define MSG_MCAST	0x200
+#define MSG_USECRYPTO	0x400
+#define MSG_USESIGNATURE	0x800
+
 sys_semaphore_t data_channel_wait_mutex;
 
 static int active_socket[4] = {NONE, NONE, NONE, NONE}; // 0=FTP, 1=WWW, 2=PS3MAPI, 3=PS3NETSRV

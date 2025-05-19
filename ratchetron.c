@@ -398,19 +398,9 @@ static void handleclient_ps3mapi(u64 conn_s_ps3mapi_p)
     while(connactive == 1) {
         memset(buffer, 0, sizeof(buffer));
 
-        long received = 0;
-
         // Read command, 1 byte
         // Flag 0x40 is MSG_DONTWAIT
-        while ((received = recv(conn_s, buffer, 1, 0x40)) > 0) {
-            if (received > 0x80000000) {
-                if (received != 0x80010223) {  // Just means there was no data available.
-                    connactive = 0;
-                    break;
-                }
-                continue;
-            }
-
+        if (recv(conn_s, buffer, 1, 0x0) > 0) {
             switch(buffer[0]) {
                 case CLT_CMD_NOTIFY: {
                     int msg_size = 0;
@@ -615,6 +605,9 @@ static void handleclient_ps3mapi(u64 conn_s_ps3mapi_p)
                     // error of some kind, recover?
                 }
             }
+        } else {
+            connactive = 0;
+            break;
         }
     }
 
@@ -652,7 +645,7 @@ void ps3mapi_thread(__attribute__((unused)) u64 arg)
         relisten:
         if(working) {
             list_s = slisten(APIPORT, 128);
-            show_msg("Ratchetron loaded!");
+            show_msg("Ratchetron loaded and listening.");
         } else {
             goto end;
         }
