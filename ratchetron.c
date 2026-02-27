@@ -248,7 +248,9 @@ static void async_data_handle(u64 sa) {
         }
 
         if (!IS_INGAME) {
-            memorySubContainer->fwd = NULL;
+			// fix bug where disconnecting ratchetron or connecting it at the wrong time would crash the console
+			sys_timer_usleep(8333);
+            // memorySubContainer->fwd = NULL;
             continue;
         }
 
@@ -517,11 +519,12 @@ static void handleclient_ps3mapi(u64 conn_s_ps3mapi_p)
                     async_desc->open = 1;
                     async_desc->tcp_sock_fd = conn_s;
 
-                    if (sys_ppu_thread_create(&async_t_id, async_data_handle, (u64)async_desc, THREAD_PRIO_POLL, THREAD_STACK_SIZE_24KB, SYS_PPU_THREAD_CREATE_JOINABLE, THREAD_NAME_ASYNC_DATA) == CELL_OK) {
-                        send(conn_s, '\x01', 1, 0);
-                    } else {
-                        send(conn_s, '\x00', 1, 0);
-                    }
+					// since the thread was never joined in the first place, we should use SYS_PPU_THREAD_CREATE_NORMAL to ensure the PS3 doesn't run out of threads to create.
+					if (sys_ppu_thread_create(&async_t_id, async_data_handle, (u64)async_desc, THREAD_PRIO_POLL, THREAD_STACK_SIZE_24KB, SYS_PPU_THREAD_CREATE_NORMAL, THREAD_NAME_ASYNC_DATA) == CELL_OK) {
+						send(conn_s, '\x01', 1, 0);
+					} else {
+						send(conn_s, '\x00', 1, 0);
+					}
                     break;
                 }
                 case CLT_CMD_SUB_MEM: {
