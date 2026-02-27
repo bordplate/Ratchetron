@@ -82,6 +82,11 @@ typedef unsigned char BYTE;
 #define RATCHETRON_CONNECT_NOTIF 	    "Ratchetron: Client connected [%s]\r\n"
 #define RATCHETRON_DISCONNECT_NOTIF     "Ratchetron: Client disconnected [%s]\r\n"
 
+#define GAME_STATUS_INIT    0
+#define GAME_STATUS_NONE    1
+#define GAME_STATUS_IN_GAME 2
+
+
 struct MemorySub {
     u32 pid;
     u32 addr;
@@ -237,6 +242,7 @@ static void async_data_handle(u64 sa) {
         if (reallocating == 1) {  // wait for reallocation to finish
             continue;
         }
+		
 
         struct MemorySubContainer *memorySubContainer = memory_sub_area;
 
@@ -247,14 +253,23 @@ static void async_data_handle(u64 sa) {
             sendto(s, &resp, sizeof(resp), 0, &sockaddr, sizeof(struct sockaddr_in));
         }
 
+		
         if (!IS_INGAME) {
 			// fix bug where disconnecting ratchetron or connecting it at the wrong time would crash the console
+			// idk just sleep if we're not ingame lol
 			sys_timer_usleep(8333);
-            // memorySubContainer->fwd = NULL;
             continue;
         }
+		
+		// just check pid constantly so that the moment the pid changes, we DONT want to run any of the networking stuff below.
+		uint32_t current_pid = GetGameProcessID();
+		uint32_t gStatus = GAME_STATUS_INIT;
+		if (current_pid == 0)
+			gStatus = GAME_STATUS_NONE;
+		else 
+			gStatus = GAME_STATUS_IN_GAME;
 
-        while (memorySubContainer->fwd != NULL && IS_INGAME) {
+        while (memorySubContainer->fwd != NULL && IS_INGAME && gStatus == GAME_STATUS_IN_GAME) {
             if (memorySubContainer->free == 1 || memorySubContainer->sock_fd != owning_sock) {  // we don't do anything with free'd stuff or stuff that doesn't belong to this connection
                 memorySubContainer = memorySubContainer->fwd;
                 continue;
@@ -715,6 +730,7 @@ void ps3mapi_thread(__attribute__((unused)) u64 arg)
         memset(memory_sub_area, 0, 1024 * 32);
         memory_sub_size = 1024 * 32;
     }
+	
 
     int core_minversion = 0;
     {
