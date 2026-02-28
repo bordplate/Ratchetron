@@ -1,10 +1,9 @@
 #include <sys/prx.h>
 
 #include "include/types.h"
-#include "include/timer.h"
 #include "include/common.h"
-
 #include "include/thread.h"
+#include "include/timer.h"
 
 #include <semaphore.h>
 
@@ -21,8 +20,10 @@ SYS_MODULE_EXIT(ratchetron_stop);
 #include "include/ps3mapi.h"
 #include "include/ratchetron.h"
 
+
 int ratchetron_start(size_t args, void *argp)
 {
+	
     sys_ppu_thread_create(&thread_id_ps3mapi, ps3mapi_thread, NULL, THREAD_PRIO, THREAD_STACK_SIZE_PS3MAPI_SVR, SYS_PPU_THREAD_CREATE_JOINABLE, THREAD_NAME_PS3MAPI);
 
 	_sys_ppu_thread_exit(0); // remove for ccapi compatibility  // left this comment from original webman source, don't know what they're trying to say because this works fine with ccapi installed

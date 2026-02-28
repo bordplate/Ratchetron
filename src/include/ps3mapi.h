@@ -50,24 +50,6 @@ static void ps3mapi_get_process_name_by_id(u32 pid, char *name, u16 size)
 	system_call_4(SC_COBRA_SYSCALL8, SYSCALL8_OPCODE_PS3MAPI, PS3MAPI_OPCODE_GET_PROC_NAME_BY_PID, (u64)pid, (u64)(u32)name);
 }
 
-/*static u32 get_current_pid(void)
-{
-	if(IS_INGAME)
-		return GetGameProcessID();
-
-	u32 pid_list[16];
-	{system_call_3(SC_COBRA_SYSCALL8, SYSCALL8_OPCODE_PS3MAPI, PS3MAPI_OPCODE_GET_ALL_PROC_PID, (u64)(u32)pid_list); }
-
-	for(int i = 0; i < 16; i++)
-	{
-		if(pid_list[i] > 2)
-		{
-			return pid_list[i];
-		}
-	}
-	return 0;
-}*/
-
 static int ps3mapi_get_memory(u32 pid, u32 address, char *mem, u32 size)
 {
     system_call_6(SC_COBRA_SYSCALL8, SYSCALL8_OPCODE_PS3MAPI, PS3MAPI_OPCODE_GET_PROC_MEM, (u64)pid, (u64)address, (u64)(u32)mem, size);

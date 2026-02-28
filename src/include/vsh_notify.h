@@ -97,7 +97,7 @@ static int32_t vshNotify_WithIcon(u8 icon_id, const char *msg)
 	if(icon_id < 18) plugin = (char*)"system_plugin";
 
 	if(IS_INGAME)
-		return vshtask_notify(msg);
+		return vshtask_notify(0, msg);
 
 	uint32_t _plugin = View_Find(plugin);
 	if (_plugin <= 0)
@@ -117,17 +117,13 @@ static int32_t vshNotify_WithIcon(u8 icon_id, const char *msg)
 
 static void show_msg(const char *text)
 {
-	//if(!vshtask_notify)
-	//	vshtask_notify = getNIDfunc("vshtask", 0xA02D46E7, 0);
-	//if(!vshtask_notify) return;
-
 	char msg[240];
 	snprintf(msg, 240, "%s", text);
 
 	if(strstr(msg, "&icon="))
 		vshNotify_WithIcon(0, msg);
 	else
-		vshtask_notify(msg);
+		vshtask_notify(0, msg);
 }
 
 #endif

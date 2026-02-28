@@ -30,7 +30,6 @@
 #include "types.h"
 
 #include "ps3mapi.h"
-#include "buffer_size.h"
 #include "socket.h"
 #include "thread.h"
 #include "vsh_notify.h"
@@ -60,10 +59,10 @@
 #define CELL_FS_O_TRUNC         001000
 #define CELL_FS_O_APPEND        002000
 #define CELL_FS_O_ACCMODE       000003
-#define        CELL_FS_O_RDONLY 000000
-#define        CELL_FS_O_RDWR   000002
-#define        CELL_FS_O_WRONLY 000001
-#define CELL_FS_O_MSELF		010000
+#define CELL_FS_O_RDONLY        000000
+#define CELL_FS_O_RDWR          000002
+#define CELL_FS_O_WRONLY        000001
+#define CELL_FS_O_MSELF		    010000
 
 sys_semaphore_t data_channel_wait_mutex;
 

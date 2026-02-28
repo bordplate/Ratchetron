@@ -43,4 +43,3 @@
 
 #define MAX_WWW_THREADS		(8)
 #define MAX_FTP_THREADS		(10)
-
