@@ -7,7 +7,8 @@ LIBSTUB_DIR			= ./lib
 PRX_DIR				= .
 INSTALL				= cp
 PEXPORTPICKUP		= ppu-lv2-prx-exportpickup
-PRX_LDFLAGS_EXTRA	= -L $(LIBSTUB_DIR) -Wl,--strip-unused-data
+SDKLIB_DIR			= $(CELL_SDK)/target/ppu/lib
+PRX_LDFLAGS_EXTRA	= -L $(LIBSTUB_DIR) -L $(SDKLIB_DIR) -Wl,--strip-unused-data
 
 CRT_HEAD += $(shell ppu-lv2-gcc -print-file-name'='ecrti.o)
 CRT_HEAD += $(shell ppu-lv2-gcc -print-file-name'='crtbegin.o)
@@ -20,7 +21,7 @@ PPU_PRX_LDFLAGS += $(PRX_LDFLAGS_EXTRA)
 PPU_PRX_STRIP_FLAGS = -s
 PPU_PRX_LDLIBS	=	-lfs_stub -lnet_stub -lrtc_stub -lio_stub -lstdc_export_stub \
 					-lvshcommon_export_stub \
-					-lpaf_export_stub \
+					-lpaf_export_stub -lxsetting_export_stub \
 					-lvshmain_export_stub \
 					-lvshtask_export_stub -lsdk_export_stub -lallocator_export_stub
 

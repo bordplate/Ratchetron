@@ -33,6 +33,15 @@ extern uint32_t GetCurrentRunningMode(void) __asm__("vshmain_EB757101");
 // Returns game u32 process id
 extern uint32_t GetGameProcessID(void) __asm__("vshmain_0624D3AE");
 
+// Returns current user ID
+typedef struct {
+    int32_t (*unk[12])(void);
+    int32_t (*GetCurrentUserNumber)(void);
+} xusers_class;
+
+extern xusers_class* xusers(void)__asm__("xsetting_CC56EB2D");
+
+// Gets current game ID
 game_plugin_interface * game_interface;
 static int get_game_info(void) {
 	if(IS_ON_XMB) return 0; 

@@ -68,6 +68,8 @@ typedef unsigned char BYTE;
 #define CLT_CMD_LV2_POKE        (u8)0x0f    // <CMD|B:1><ADDR|I:8><VALUE|I:8>
 #define CLT_CMD_OPEN_FILE       (u8)0x10    // <CMD|B:1><FLAGS|I:4><PATH_SIZE|I:4><PATH|S:PATH_SIZE>
 #define CLT_CMD_WRITE_FILE      (u8)0x11    // <CMD|B:1><DESC|I:4><LEN|I:4><DATA:LEN>
+#define CLT_CMD_USER_ID         (u8)0x12    // <CMD|B:1>
+#define CLT_CMD_DELETE_DIR      (u8)0x13    // <CMD|B:1><PATH_SIZE|I:4><PATH|S:PATH_SIZE>
 
 #define MEM_SUB_TYPE_FREEZE     (u8)0x01
 #define MEM_SUB_TYPE_NOTIFY     (u8)0x02
@@ -125,6 +127,31 @@ void debug_msg(const char *message) {
     if (debug_enabled == 1) {
         show_msg(message);
     }
+}
+
+static int rmdir_recursive(const char *path) {
+    int fd;
+    if (cellFsOpendir(path, &fd) != CELL_OK)
+        return -1;
+
+    CellFsDirent entry;
+    uint64_t nread;
+    while (cellFsReaddir(fd, &entry, &nread) == CELL_OK && nread > 0) {
+        if (strcmp(entry.d_name, ".") == 0 || strcmp(entry.d_name, "..") == 0)
+            continue;
+
+        char child[1024];
+        snprintf(child, sizeof(child), "%s/%s", path, entry.d_name);
+
+        if (entry.d_type == CELL_FS_TYPE_DIRECTORY) {
+            rmdir_recursive(child);
+        } else {
+            cellFsUnlink(child);
+        }
+    }
+
+    cellFsClosedir(fd);
+    return cellFsRmdir(path);
 }
 
 // this doesn't work
@@ -696,6 +723,24 @@ static void handleclient_ps3mapi(u64 conn_s_ps3mapi_p)
 
                     break;
                 }
+				case CLT_CMD_USER_ID: {
+					u32 user_id = (u32)xusers()->GetCurrentUserNumber();
+				
+					send(conn_s, &user_id, sizeof(user_id), 0);
+					break;
+				}
+				case CLT_CMD_DELETE_DIR: {
+					u32 pathLen;
+					char path[1024];
+				
+					recv(conn_s, &pathLen, sizeof(pathLen), 0);
+					recv(conn_s, &path, pathLen, 0);
+				
+					int err = rmdir_recursive(path);
+					send(conn_s, &err, sizeof(err), 0);
+				
+					break;
+				}
                 case CLT_CMD_ENABLE_DEBUG: {
                     debug_enabled = 1;
                     break;
